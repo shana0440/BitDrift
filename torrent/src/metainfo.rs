@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-// https://bittorrent.org/beps/bep_0003.html#metainfo-files
+// implementation of https://bittorrent.org/beps/bep_0003.html#metainfo-files
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MetaInfo {
     pub announce: String,
