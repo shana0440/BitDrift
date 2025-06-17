@@ -1,21 +1,24 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
+use url::Url;
 
 use crate::types::Sha1Hash;
-
-pub use serde_bencode::Error as BencodeError;
 
 pub(crate) type Result<T> = std::result::Result<T, MetaInfoError>;
 
 #[derive(Error, Debug)]
-enum MetaInfoError {
+pub enum MetaInfoError {
     #[error("Failed to parse .torrent file")]
-    Bencode(#[from] BencodeError),
+    Bencode(#[from] serde_bencode::Error),
+
+    #[error("Failed to parse URL")]
+    InvalidAnnounce(#[from] url::ParseError),
 }
 
+#[derive(Debug)]
 pub struct MetaInfo {
-    pub announce: String,
+    pub announce: Url,
     pub info: raw::Info,
     pub comment: Option<String>,
     pub created_by: Option<String>,
@@ -28,7 +31,7 @@ impl MetaInfo {
         let metainfo: raw::MetaInfo = serde_bencode::from_bytes(bytes)?;
         let info_hash = metainfo.calculate_info_hash()?;
         Ok(Self {
-            announce: metainfo.announce,
+            announce: Url::parse(&metainfo.announce)?,
             info: metainfo.info,
             comment: metainfo.comment,
             created_by: metainfo.created_by,
@@ -63,6 +66,10 @@ mod raw {
         pub pieces: Vec<u8>,
         pub length: Option<u64>,
         pub files: Option<Vec<File>>,
+        // We not going to use the extra fields,
+        // but we need this to capture any additional fields to get the correct info_hash.
+        #[serde(flatten)]
+        pub extra: std::collections::BTreeMap<String, serde_bencode::value::Value>,
     }
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -89,6 +96,7 @@ mod raw {
                 .field("pieces", &"<pieces...>")
                 .field("length", &self.length)
                 .field("files", &self.files)
+                .field("extra", &self.extra)
                 .finish()
         }
     }
