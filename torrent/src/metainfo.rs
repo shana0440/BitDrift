@@ -60,11 +60,14 @@ mod raw {
     #[derive(Serialize, Deserialize)]
     pub struct Info {
         pub name: String,
+        // How many bytes each piece is.
         #[serde(rename = "piece length")]
         pub piece_length: u32,
         #[serde(with = "serde_bytes")]
         pub pieces: Vec<u8>,
+        // If this is a single file torrent, this is the length of the file, in bytes.
         pub length: Option<u64>,
+        // If this is a multi-file torrent, this is a list of files.
         pub files: Option<Vec<File>>,
         // We not going to use the extra fields,
         // but we need this to capture any additional fields to get the correct info_hash.
@@ -74,6 +77,7 @@ mod raw {
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct File {
+        // The length of the file, in bytes.
         pub length: u64,
         pub path: Vec<String>,
     }
