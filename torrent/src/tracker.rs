@@ -1,9 +1,10 @@
+use std::net::{AddrParseError, SocketAddr};
+
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_encode};
 use reqwest::Client;
 use thiserror::Error;
 use url::Url;
 
-use crate::peer::Peer;
 use crate::types::{PeerId, Sha1Hash};
 
 pub(crate) type Result<T> = std::result::Result<T, TrackerError>;
@@ -24,12 +25,15 @@ pub enum TrackerError {
 
     #[error("Query peers failed")]
     QueryPeers(String),
+
+    #[error("Invalid IP address")]
+    InvalidIpAddr(#[from] AddrParseError),
 }
 
 #[derive(Debug)]
 pub struct Response {
     pub interval: u64,
-    pub peers: Vec<Peer>,
+    pub peers: Vec<SocketAddr>,
 }
 
 // Use to request peers from the tracker from the metainfo announce
@@ -65,7 +69,8 @@ pub struct RequestParams {
 }
 
 mod raw {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
 
     use bytes::Buf;
     use serde::{Deserialize, Serialize};
@@ -84,17 +89,33 @@ mod raw {
     }
 
     #[derive(Debug, Serialize, Deserialize)]
+    struct PeerItem {
+        #[serde(rename = "id")]
+        peer_id: Option<crate::types::PeerId>,
+        #[serde(rename = "ip")]
+        ip: String,
+        #[serde(rename = "port")]
+        port: u16,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum Peer {
-        List(Vec<crate::peer::Peer>),
+        List(Vec<PeerItem>),
         #[serde(with = "serde_bytes")]
         Compact(Vec<u8>),
     }
 
     impl Peer {
-        pub fn to_vec(&self) -> Vec<crate::peer::Peer> {
-            match self {
-                Peer::List(peers) => peers.to_vec(),
+        pub fn to_vec(&self) -> Result<Vec<SocketAddr>> {
+            Ok(match self {
+                Peer::List(peers) => peers
+                    .iter()
+                    .map(|peer| {
+                        let ip: IpAddr = peer.ip.parse()?;
+                        Ok(SocketAddr::new(ip, peer.port))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
                 // in compact format, each peer is represented by 6 bytes:
                 // 4 bytes for the IPv4 address and 2 bytes for the port number
                 // https://www.bittorrent.org/beps/bep_0023.html
@@ -104,16 +125,14 @@ mod raw {
                     for mut chunk in bytes.chunks(6) {
                         if chunk.len() == 6 {
                             let ip = Ipv4Addr::from(chunk.get_u32());
-                            print!("chunk: {:?}", chunk);
                             let port = chunk.get_u16();
-                            print!("ip: {:?}, port: {:?}", ip, port);
                             let addr = SocketAddr::new(IpAddr::V4(ip), port);
-                            peers.push(crate::peer::Peer::from_socket_addr(addr));
+                            peers.push(addr);
                         }
                     }
                     peers
                 }
-            }
+            })
         }
     }
 
@@ -176,7 +195,7 @@ impl Tracker {
             Ok(resp) => match resp {
                 raw::Response::Success(resp) => Ok(Response {
                     interval: resp.interval,
-                    peers: resp.peers.to_vec(),
+                    peers: resp.peers.to_vec()?,
                 }),
                 raw::Response::Error(e) => Err(TrackerError::QueryPeers(e.failure_reason)),
             },
@@ -184,6 +203,7 @@ impl Tracker {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +220,8 @@ mod tests {
         let compact = raw::Peer::Compact(compact_bytes);
 
         let peers = compact.to_vec();
+        assert!(peers.is_ok());
+        let peers = peers.unwrap();
         assert_eq!(peers.len(), 2);
 
         let expected_addrs = vec![
@@ -208,8 +230,7 @@ mod tests {
         ];
 
         for (peer, expected_addr) in peers.iter().zip(expected_addrs.iter()) {
-            assert_eq!(peer.ip, expected_addr.ip().to_string());
-            assert_eq!(peer.port, expected_addr.port());
+            assert_eq!(peer, expected_addr);
         }
     }
 }

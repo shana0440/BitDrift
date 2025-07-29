@@ -1,5 +1,13 @@
+mod choker;
+mod hash;
 mod message;
 pub mod metainfo;
 mod peer;
+mod peer_connection;
+mod peer_stats;
+mod piece;
+mod piece_picker;
+mod session;
+pub mod torrent;
 pub mod tracker;
 mod types;

@@ -13,7 +13,7 @@ pub struct PiecePicker {
 // https://www.bittorrent.org/beps/bep_0003.html#peer-messages
 const BLOCK_SIZE: u32 = 16 * 1024;
 
-struct BlockInfo {
+pub struct BlockInfo {
     pub piece_index: u32,
     pub begin: u32,
     pub length: u32,
@@ -22,7 +22,7 @@ struct BlockInfo {
 }
 
 impl BlockInfo {
-    fn new(piece_index: u32, begin: u32, length: u32) -> Self {
+    pub fn new(piece_index: u32, begin: u32, length: u32) -> Self {
         Self {
             piece_index,
             begin,
@@ -35,7 +35,7 @@ impl BlockInfo {
         self.begin / BLOCK_SIZE
     }
 
-    fn is_same_block(&self, block: &BlockInfo) -> bool {
+    pub fn is_same_block(&self, block: &BlockInfo) -> bool {
         self.piece_index == block.piece_index
             && self.begin == block.begin
             && self.length == block.length

@@ -42,6 +42,8 @@ impl MetaInfo {
 }
 
 mod raw {
+    use crate::hash::calculate_sha1_hash;
+
     use super::*;
     use sha1::{Digest, Sha1};
 
@@ -63,6 +65,8 @@ mod raw {
         // How many bytes each piece is.
         #[serde(rename = "piece length")]
         pub piece_length: u32,
+        // The SHA1 hash of each piece, concatenated together.
+        // Used to verify the integrity of the pieces.
         #[serde(with = "serde_bytes")]
         pub pieces: Vec<u8>,
         // If this is a single file torrent, this is the length of the file, in bytes.
@@ -85,9 +89,7 @@ mod raw {
     impl MetaInfo {
         pub fn calculate_info_hash(&self) -> Result<Sha1Hash> {
             let info = serde_bencode::to_bytes(&self.info)?;
-            let digest = Sha1::digest(&info);
-            let mut info_hash = [0u8; 20];
-            info_hash.copy_from_slice(&digest);
+            let info_hash = calculate_sha1_hash(info);
             Ok(info_hash)
         }
     }

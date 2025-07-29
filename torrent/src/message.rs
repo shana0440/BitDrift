@@ -3,7 +3,7 @@ use std::io;
 use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::types::{PeerId, Sha1Hash};
+use crate::types::{BitField, PeerId, Sha1Hash};
 
 const PROTOCOL_STRING: &[u8] = b"BitTorrent protocol";
 
@@ -73,7 +73,7 @@ trait MessageEncodable {
 
 #[repr(u8)]
 #[derive(Debug)]
-enum MessageId {
+pub enum MessageId {
     Choke = 0,
     Unchoke = 1,
     Interested = 2,
@@ -107,7 +107,7 @@ impl TryFrom<u8> for MessageId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
     KeepAlive,
     Choke,
@@ -118,7 +118,7 @@ pub enum Message {
         piece_index: u32,
     },
     Bitfield {
-        bitfield: Vec<u8>,
+        bitfield: BitField,
     },
     Request {
         piece_index: u32,
@@ -177,7 +177,12 @@ impl Message {
                 None
             }
             Message::Have { piece_index } => Some(piece_index.to_be_bytes().to_vec()),
-            Message::Bitfield { bitfield } => Some(bitfield.clone()),
+            Message::Bitfield { bitfield } => {
+                // bitfield.len() is the number of bits, we need to convert it to bytes
+                let mut buffer = Vec::with_capacity(bitfield.len() / 8);
+                buffer.extend_from_slice(bitfield.as_raw_slice());
+                Some(buffer)
+            }
             Message::Request {
                 piece_index,
                 begin,
@@ -243,6 +248,7 @@ impl Decoder for MessageCodec {
             return Ok(None); // Not enough data for a length prefix
         }
 
+        // length include the message ID and payload
         let length = (&src[..4]).get_u32() as usize;
         if src.len() < 4 + length {
             return Ok(None); // Not enough data for the full message
@@ -265,7 +271,9 @@ impl Decoder for MessageCodec {
             MessageId::Bitfield => {
                 // bitfield length = length - 1 (1 byte for the message ID)
                 let bitfield = src.split_to(length - 1).to_vec();
-                Ok(Some(Message::Bitfield { bitfield }))
+                Ok(Some(Message::Bitfield {
+                    bitfield: BitField::from_vec(bitfield),
+                }))
             }
             MessageId::Request => {
                 let piece_index = src.get_u32();
