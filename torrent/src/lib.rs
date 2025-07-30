@@ -1,4 +1,5 @@
 mod choker;
+mod disk;
 mod hash;
 mod message;
 pub mod metainfo;

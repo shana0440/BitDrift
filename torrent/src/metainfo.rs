@@ -16,7 +16,7 @@ pub enum MetaInfoError {
     InvalidAnnounce(#[from] url::ParseError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MetaInfo {
     pub announce: Url,
     pub info: raw::Info,
@@ -41,7 +41,7 @@ impl MetaInfo {
     }
 }
 
-mod raw {
+pub mod raw {
     use crate::hash::calculate_sha1_hash;
 
     use super::*;
@@ -59,7 +59,7 @@ mod raw {
         pub creation_date: Option<f64>,
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Clone)]
     pub struct Info {
         pub name: String,
         // How many bytes each piece is.
@@ -79,7 +79,7 @@ mod raw {
         pub extra: std::collections::BTreeMap<String, serde_bencode::value::Value>,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct File {
         // The length of the file, in bytes.
         pub length: u64,

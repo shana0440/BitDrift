@@ -22,12 +22,12 @@ enum PieceStatus {
     UnVerified(Vec<Block>),
 }
 
+#[derive(Clone)]
 pub struct Piece {
     pub index: usize,
     pub hash: Sha1Hash,
     pub status: PieceStatus,
     pub length: u32,
-    pub data: Vec<u8>,
 }
 
 #[derive(Clone)]
@@ -58,7 +58,7 @@ impl Piece {
 
     pub fn add_block(&mut self, block: Block) -> Result<()> {
         match &self.status {
-            PieceStatus::Verified(items) => Err(PieceError::InvalidBlock),
+            PieceStatus::Verified(_) => Err(PieceError::InvalidBlock),
             PieceStatus::UnVerified(blocks) => {
                 let mut new_blocks = blocks.clone();
                 new_blocks.push(block);
@@ -70,7 +70,7 @@ impl Piece {
 
     pub fn verify(&mut self) -> Result<Vec<u8>> {
         match &self.status {
-            PieceStatus::Verified(data) => Ok(()),
+            PieceStatus::Verified(data) => Ok(data.clone()),
             PieceStatus::UnVerified(blocks) => {
                 if !self.is_all_blocks_received() {
                     return Err(PieceError::IncompleteBlocks);
@@ -94,7 +94,7 @@ impl Piece {
 
     pub fn is_all_blocks_received(&self) -> bool {
         match &self.status {
-            PieceStatus::Verified(data) => true,
+            PieceStatus::Verified(_) => true,
             PieceStatus::UnVerified(blocks) => {
                 // Last one piece may be truncated due to file length,
                 // so we check the diff between received length and expected length is less than block size
@@ -107,13 +107,6 @@ impl Piece {
                     false
                 }
             }
-        }
-    }
-
-    pub fn request(&self, begin: usize, length: usize) -> Vec<u8> {
-        match &self.status {
-            PieceStatus::Verified(data) => data[begin..begin + length].to_vec(),
-            PieceStatus::UnVerified(blocks) => panic!("Request data from unverified piece"),
         }
     }
 }
