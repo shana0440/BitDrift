@@ -39,6 +39,16 @@ impl MetaInfo {
             info_hash,
         })
     }
+
+    pub fn total_bytes(self) -> usize {
+        if let Some(length) = self.info.length {
+            return length as usize;
+        }
+        if let Some(files) = self.info.files {
+            return files.iter().fold(0, |acc, it| acc + it.length as usize);
+        }
+        panic!("Invalid metainfo, must have length or files");
+    }
 }
 
 pub mod raw {

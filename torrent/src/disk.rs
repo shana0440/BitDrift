@@ -1,11 +1,19 @@
 use std::io::{Seek, Write};
 
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
-use crate::{metainfo::MetaInfo, piece::Piece};
+use crate::{
+    metainfo::MetaInfo,
+    piece::{self, Piece},
+    types::BitField,
+};
 
 pub enum DiskCommand {
     WritePiece(MetaInfo, Piece, Vec<u8>),
+    BitField(MetaInfo, oneshot::Sender<BitField>),
     Shutdown,
 }
 
@@ -40,8 +48,18 @@ impl Disk {
         self.handle.await.unwrap();
     }
 
+    pub async fn bitfield(self, metainfo: MetaInfo) -> BitField {
+        let (tx, rx) = oneshot::channel();
+
+        let command = DiskCommand::BitField(metainfo, tx);
+        self.sender.send(command).unwrap();
+
+        rx.await.unwrap()
+    }
+
     fn handle_command(command: DiskCommand) {
         match command {
+            DiskCommand::Shutdown => {}
             DiskCommand::WritePiece(meta_info, piece, data) => {
                 let filepath = Disk::filepath(&meta_info, piece.index);
                 let offset = Disk::offset_of_file(&meta_info, piece.index);
@@ -62,7 +80,15 @@ impl Disk {
                 file.write_all(&data).unwrap();
                 file.flush().unwrap();
             }
-            DiskCommand::Shutdown => {}
+            DiskCommand::BitField(meta_info, response_tx) => {
+                // TODO: read data from disk and get which pieces are available
+                let piece_length = meta_info.info.piece_length as usize;
+                let total_bytes = meta_info.total_bytes() as usize;
+                let piece_size = total_bytes / piece_length;
+                let mut bitfield = BitField::repeat(false, piece_size);
+
+                response_tx.send(bitfield).unwrap();
+            }
         }
     }
 

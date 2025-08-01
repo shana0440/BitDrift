@@ -54,11 +54,14 @@ impl Session {
                 piece,
             } => {
                 let mut torrent = self.torrent.lock().await;
-                match torrent.add_block(Block {
-                    piece_index,
-                    begin,
-                    data: piece,
-                }) {
+                match torrent
+                    .add_block(Block {
+                        piece_index,
+                        begin,
+                        data: piece,
+                    })
+                    .await
+                {
                     Ok(_) => {}
                     Err(_) => {
                         // TODO: show error or mark block is unreceived.
@@ -72,7 +75,7 @@ impl Session {
             } => {
                 self.request_queue.retain(|block| {
                     let cancel_block = BlockInfo::new(piece_index, begin, length);
-                    !block.is_same_block(&cancel_block)
+                    !block.is_same_block_as_info(&cancel_block)
                 });
             }
         }

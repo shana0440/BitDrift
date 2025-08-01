@@ -1,4 +1,4 @@
-use crate::types::BitField;
+use crate::{piece::Block, types::BitField};
 
 // Used to track the state of each block
 pub struct PiecePicker {
@@ -35,7 +35,13 @@ impl BlockInfo {
         self.begin / BLOCK_SIZE
     }
 
-    pub fn is_same_block(&self, block: &BlockInfo) -> bool {
+    pub fn is_same_block_as_block(&self, block: &Block) -> bool {
+        self.piece_index == block.piece_index
+            && self.begin == block.begin
+            && self.length == block.data.len() as u32
+    }
+
+    pub fn is_same_block_as_info(&self, block: &BlockInfo) -> bool {
         self.piece_index == block.piece_index
             && self.begin == block.begin
             && self.length == block.length
@@ -112,11 +118,11 @@ impl PiecePicker {
         }
     }
 
-    pub fn mark_received(&mut self, piece_index: u32, block: &BlockInfo) {
+    pub fn mark_received(&mut self, block: &Block) {
         let mut_block = self
             .missing_blocks
             .iter_mut()
-            .find(|it| it.is_same_block(block));
+            .find(|it| it.is_same_block_as_block(block));
         if let Some(mut_block) = mut_block {
             mut_block.state = BlockState::Received;
             let is_all_blocks_received = self
@@ -125,7 +131,7 @@ impl PiecePicker {
                 .filter(|it| it.piece_index == block.piece_index)
                 .all(|it| it.state == BlockState::Received);
             if is_all_blocks_received {
-                self.own_bitfield.set(piece_index as usize, true);
+                self.own_bitfield.set(block.piece_index as usize, true);
             }
         }
     }

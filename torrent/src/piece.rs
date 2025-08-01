@@ -1,4 +1,3 @@
-use bitvec::vec::BitVec;
 use bytes::BytesMut;
 use thiserror::Error;
 

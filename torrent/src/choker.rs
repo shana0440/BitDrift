@@ -26,7 +26,7 @@ impl Choker {
     }
 
     /// Use to prioritizes peer to determine which peer should unchoke
-    ///  
+    ///
     /// - unchoke the interested peer
     /// - if both peer is interested, unchoke the peer that have not been unchoke for a longer time
     fn unchoke_compare_round_robin(a: &PeerConnection, b: &PeerConnection) -> Ordering {
